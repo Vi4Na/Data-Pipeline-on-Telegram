@@ -20,7 +20,7 @@ Sistema transacional: O *Telegram representa a fonte transacional de dados do pr
 O primeiro passo será criar um BOT no telegram e adiciona-lo em um grupo novo onde será capaz de armazenar todos os dados fornecidos.
 As mensagens capturadas serão acessadas via API e antes de avançar para etapa analítica é possível manipular e estruturar os dados utilizando apenas o Python nativo.
 
-##**Arquitetura**:
+***Arquitetura***:
 
 ### Telegram.
 
@@ -42,7 +42,7 @@ As mensagens capturadas serão acessadas via API e antes de avançar para etapa 
 
   - As mensagens serão restringidas apenas ao formato **TEXT**, ou seja, o **BOT** entenderá como **"[ ]"** quaisquer outro tipo de dados como imagens, vídeos, mensagens de voz, arquivos.
 
-##**Sistema analítico**:
+***Sistema analítico***:
 A etapa de ingestão é onde se armazena os dados transacionais em ambientes analíticos. O dado ingerido permanece no formato original **JSON**.
 
  *Para isso será utilizado*:
@@ -57,7 +57,7 @@ Por fim, é necessário configurar o webHook para redirecionar as mensagens do T
 
 *Código no arquivo pipeline-api.py*
 
-##**Análise Exploratória de Dados**:
+***Análise Exploratória de Dados***:
 
 ### ETL.
 
@@ -94,97 +94,28 @@ AWS Athena
 
 Na etapa de apresentação, o AWS Athena tem função de entregar o dados através de uma interface SQL para os usuários do sistema analítico. Para criar a interface, basta criar uma tabela externa sobre o dado armazenado na camada mais refinada da arquitetura, a camada enriquecida.
 
-[]
-CREATE EXTERNAL TABLE `telegram`(
-  `message_id` bigint,
-  `user_id` bigint,
-  `user_is_bot` boolean,
-  `user_first_name` string,
-  `chat_id` bigint,
-  `chat_type` string,
-  `text` string,
-  `date` bigint)
-PARTITIONED BY (
-  `context_date` date)
-ROW FORMAT SERDE
-  'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
-STORED AS INPUTFORMAT
-  'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'
-OUTPUTFORMAT
-  'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
-LOCATION
-  's3://projeto4-datalake-enriched/telegram/'
-[]
+![image](https://github.com/Vi4Na/Data-Pipeline-on-Telegram/assets/136501829/6ae7ff5b-3333-4acc-9fdd-0eacb23127ff)
+
 
 > **Importante**: Toda vez que uma nova partição é adicionada ao repositório de dados, é necessário informar o `AWS Athena` para que a ela esteja disponível via SQL. Para isso, use o comando SQL `MSCK REPAIR TABLE <nome-tabela>` para todas as partições. Toda vez que uma nova partição é adicionada ao repositório de dados, é necessário informar o `AWS Athena` para que a ela esteja disponível via SQL.
 
-Análise de Dados
+![image](https://github.com/Vi4Na/Data-Pipeline-on-Telegram/assets/136501829/1cb585f8-ac5e-40be-ad1c-e8c848dc4f02)
+
+### Análise de Dados.
 Com o dado disponível, usuário podem executar as mais variadas consultas analíticas. Seguem alguns exemplos:
 
 **Quantidade de mensagens por dia.**
-[]
-SELECT
-  context_date,
-  count(1) AS "message_amount"
-FROM "telegram"
-GROUP BY context_date
-ORDER BY context_date DESC
-[]
+
+![image](https://github.com/Vi4Na/Data-Pipeline-on-Telegram/assets/136501829/0258a25b-fb52-4b26-880d-36fb28523ee9)
+
 **Quantidade de mensagens por usuário por dia.**
-[]
-SELECT
-  user_id,
-  user_first_name,
-  context_date,
-  count(1) AS "message_amount"
-FROM "telegram"
-GROUP BY
-  user_id,
-  user_first_name,
-  context_date
-ORDER BY context_date DESC
-[]
+
+![image](https://github.com/Vi4Na/Data-Pipeline-on-Telegram/assets/136501829/204ebb0c-4cd7-4be9-aa89-4f05b9f34dc1)
+
 **Média do tamanho das mensagens por usuário por dia.**
-[]
-SELECT
-  user_id,
-  user_first_name,
-  context_date,
-  CAST(AVG(length(text)) AS INT) AS "average_message_length"
-FROM "telegram"
-GROUP BY
-  user_id,
-  user_first_name,
-  context_date
-ORDER BY context_date DESC
-[]
+
+![image](https://github.com/Vi4Na/Data-Pipeline-on-Telegram/assets/136501829/ff7f9f11-7f60-4a09-b812-b09f11ceb3ff)
+
 **Quantidade de mensagens por hora por dia da semana por número da semana.**
-[]
-WITH
-parsed_date_cte AS (
-    SELECT
-        *,
-        CAST(date_format(from_unixtime("date"),'%Y-%m-%d %H:%i:%s') AS timestamp) AS parsed_date
-    FROM "telegram"
-),
-hour_week_cte AS (
-    SELECT
-        *,
-        EXTRACT(hour FROM parsed_date) AS parsed_date_hour,
-        EXTRACT(dow FROM parsed_date) AS parsed_date_weekday,
-        EXTRACT(week FROM parsed_date) AS parsed_date_weeknum
-    FROM parsed_date_cte
-)
-SELECT
-    parsed_date_hour,
-    parsed_date_weekday,
-    parsed_date_weeknum,
-    count(1) AS "message_amount"
-FROM hour_week_cte
-GROUP BY
-    parsed_date_hour,
-    parsed_date_weekday,
-    parsed_date_weeknum
-ORDER BY
-    parsed_date_weeknum,
-    parsed_date_weekday
+
+![image](https://github.com/Vi4Na/Data-Pipeline-on-Telegram/assets/136501829/08592abd-dd04-4487-a08c-59e01b864954)
